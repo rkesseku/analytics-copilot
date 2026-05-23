@@ -1,0 +1,59 @@
+[project]
+name = "analytics-copilot"
+version = "0.1.0"
+description = "Conversational analytics copilot: natural-language to governed SQL with RAG over schema metadata."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Reagan Kesseku", email = "reagankesseku@gmail.com" }
+]
+license = { text = "MIT" }
+keywords = ["llm", "text-to-sql", "rag", "analytics", "duckdb"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+]
+
+dependencies = [
+    "groq>=0.11.0",
+    "duckdb>=1.1.0",
+    "sqlglot>=25.0.0",
+    "pydantic>=2.5.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.6.0",
+    "mypy>=1.10.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/rkesseku/analytics-copilot"
+Repository = "https://github.com/rkesseku/analytics-copilot"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["analytics_copilot*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+python_classes = ["Test*"]
+filterwarnings = [
+    "ignore::pytest.PytestCollectionWarning",
+]
