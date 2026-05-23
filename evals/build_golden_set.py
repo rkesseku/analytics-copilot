@@ -220,7 +220,7 @@ def build() -> Path:
         "# expected_rows — regenerate the file after changing seed data or schema.\n"
         "# Hand-edit questions/reference_sql freely, then regenerate.\n\n"
     )
-    GOLDEN_PATH.write_text(header + yaml.safe_dump(entries, sort_keys=False))
+    GOLDEN_PATH.write_text(header + yaml.safe_dump(entries, sort_keys=False, allow_unicode=True), encoding="utf-8")
     return GOLDEN_PATH
 
 

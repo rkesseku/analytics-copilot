@@ -90,7 +90,7 @@ class EvalReport:
 
 def load_golden_set(path: str | Path) -> list[GoldenCase]:
     """Parse a YAML golden set into GoldenCase objects."""
-    raw = yaml.safe_load(Path(path).read_text())
+    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     cases = []
     for entry in raw:
         if entry.get("skip_until_computed"):
