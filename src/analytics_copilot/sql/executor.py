@@ -20,7 +20,6 @@ from dataclasses import dataclass
 from analytics_copilot.db.database import Database, QueryResult
 from analytics_copilot.sql.validator import (
     SQLValidator,
-    SQLValidationError,
     ValidationResult,
 )
 
