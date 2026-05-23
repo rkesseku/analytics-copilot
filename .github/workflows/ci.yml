@@ -5,20 +5,20 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    # Nightly live eval at 09:00 UTC
+    - cron: "0 9 * * *"
 
 jobs:
   test:
-    name: Test on Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
-
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
 
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -30,9 +30,58 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
+          # Streamlit and PyYAML aren't in [dev] yet; install explicitly.
+          pip install pyyaml streamlit
 
       - name: Lint with ruff
-        run: ruff check src tests
+        run: ruff check .
 
       - name: Run pytest with coverage
-        run: pytest -v --cov=analytics_copilot --cov-report=term-missing
+        run: pytest --cov=analytics_copilot --cov=evals --cov-report=term-missing
+
+  evals-dry-run:
+    # Dry-run uses the golden set's reference SQL — no LLM, no API key needed.
+    # Runs on every PR so the harness itself is exercised constantly.
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install pyyaml streamlit
+      - name: Run eval suite (dry-run, reference SQL)
+        run: python -m evals.run --dry-run --min-pass-rate 1.0
+
+  evals-live:
+    # Live eval against Groq. Runs only on main pushes and the nightly schedule
+    # so PRs don't gate on LLM availability or burn the API budget per push.
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'schedule' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install pyyaml streamlit
+      - name: Run eval suite (live LLM)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          if [ -z "$GROQ_API_KEY" ]; then
+            echo "GROQ_API_KEY not set — skipping live eval"
+            exit 0
+          fi
+          # Start lenient (50%) and ratchet up as the pipeline matures.
+          python -m evals.run --min-pass-rate 0.5 --verbose
