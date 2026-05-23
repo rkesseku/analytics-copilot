@@ -52,7 +52,7 @@ target-version = "py310"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 python_classes = ["Test*"]
 filterwarnings = [
     "ignore::pytest.PytestCollectionWarning",

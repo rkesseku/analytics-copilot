@@ -135,4 +135,124 @@ tests/                     # 52 unit tests, no network calls in CI
 
 ## License
 
-MIT
+MIT# README additions
+
+Append the following sections to your existing `README.md` (or merge into the
+corresponding sections if they already exist).
+
+---
+
+## Governance
+
+Every LLM-generated SQL query passes through `app/governance/enforce()` before
+hitting the database. The default policy:
+
+- **Read-only.** Only `SELECT` (and `WITH ... SELECT`) statements are allowed.
+  Any `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `PRAGMA`, etc. raises
+  `GovernanceError`.
+- **Single statement.** Multi-statement payloads (`SELECT ...; DROP TABLE ...`)
+  are rejected.
+- **Table allowlist.** Queries may only reference `customers`, `products`,
+  `orders`, `order_items`.
+- **PII column block.** Any reference to `email` (in `SELECT`, `WHERE`,
+  anywhere) is rejected.
+- **Row cap.** Results are capped at 1000 rows. A missing `LIMIT` clause is
+  injected; an existing `LIMIT` higher than the cap is lowered.
+
+Tune the policy in `app/governance/policy.py`. Add new guardrails by
+extending `enforce()` and the corresponding test cases.
+
+## Eval harness
+
+Reproducible, executable evals over a SQLite fixture. Each case in
+`evals/golden_sets/shop.yaml` defines a natural-language question and the
+result rows the answer must return.
+
+```bash
+# Smoke test the harness (no LLM calls)
+python -m evals.run --dry-run
+
+# Live eval against Groq
+export GROQ_API_KEY=...
+python -m evals.run --verbose
+
+# Gate CI on a minimum pass rate
+python -m evals.run --min-pass-rate 0.8
+```
+
+The scorer compares **result rows**, not SQL strings — semantically equivalent
+queries (different aliases, JOIN order, subqueries vs CTEs) all count as
+correct as long as they return the same data.
+
+Add new cases by appending to `shop.yaml`. Keep `id` values stable so
+historical eval runs stay comparable across PRs.
+
+## UI
+
+```bash
+streamlit run app/ui/streamlit_app.py
+```
+
+Type a question; see the generated SQL, the rows, and a plain-English summary.
+Governance errors surface as visible blocks rather than silent failures.
+# README additions
+
+Append the following sections to your existing `README.md` (or merge into the
+corresponding sections if they already exist).
+
+---
+
+## Eval harness
+
+Reproducible, executable evals over the seeded DuckDB fixture. Each case in
+`evals/golden_sets/shop.yaml` defines a natural-language question and the
+result rows the answer must return.
+
+The golden set is **generated programmatically** from the actual seed data —
+don't hand-edit `expected_rows`. To add or change questions, edit
+`evals/build_golden_set.py` and run:
+
+```bash
+python -m evals.build_golden_set
+```
+
+Then run the eval suite:
+
+```bash
+# Smoke test the harness (no LLM calls — uses reference SQL)
+python -m evals.run --dry-run
+
+# Live eval against Groq
+export GROQ_API_KEY=...
+python -m evals.run --verbose
+
+# Gate CI on a minimum pass rate
+python -m evals.run --min-pass-rate 0.8
+```
+
+The scorer compares **result rows**, not SQL strings — semantically equivalent
+queries (different aliases, JOIN order, subqueries vs CTEs) all count as
+correct as long as they return the same data.
+
+Add new cases by editing `evals/build_golden_set.py`. Keep `id` values stable
+so historical eval runs stay comparable across PRs.
+
+## UI
+
+```bash
+streamlit run src/analytics_copilot/ui/streamlit_app.py
+```
+
+Type a question; see the validated SQL, the rows, and a plain-English summary.
+Validation errors (mutations, disallowed tables, etc.) surface as visible
+blocks rather than silent failures.
+
+## Adding new dependencies
+
+The eval harness and UI add two runtime dependencies:
+
+- `pyyaml` — for golden-set serialization
+- `streamlit` — for the UI
+
+Add these to `[project] dependencies` in `pyproject.toml`, or install them
+explicitly with `pip install pyyaml streamlit`.
