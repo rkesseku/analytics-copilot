@@ -52,9 +52,7 @@ class GroqClient:
         load_dotenv()
         key = api_key or os.getenv("GROQ_API_KEY")
         if not key:
-            raise RuntimeError(
-                "GROQ_API_KEY not set. Copy .env.example to .env and add your key."
-            )
+            raise RuntimeError("GROQ_API_KEY not set. Copy .env.example to .env and add your key.")
         self._client = Groq(api_key=key)
         self.model = model or self.DEFAULT_MODEL
 

@@ -71,9 +71,7 @@ class KeywordSchemaRetriever:
             raise ValueError("top_k must be >= 1.")
 
         tokens = self._tokenize(question)
-        scored: list[tuple[TableInfo, float]] = [
-            (t, self._score(t, tokens)) for t in self._tables
-        ]
+        scored: list[tuple[TableInfo, float]] = [(t, self._score(t, tokens)) for t in self._tables]
 
         # Sort by score descending, with stable ordering by table name as tiebreak
         scored.sort(key=lambda x: (-x[1], x[0].name))

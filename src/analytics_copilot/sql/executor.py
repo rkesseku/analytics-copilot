@@ -29,7 +29,7 @@ class ExecutionResult:
     """Outcome of safely executing a SQL query."""
 
     original_sql: str
-    executed_sql: str            # may differ from original if LIMIT was added
+    executed_sql: str  # may differ from original if LIMIT was added
     result: QueryResult
     tables_referenced: tuple[str, ...]
     row_limit_added: bool

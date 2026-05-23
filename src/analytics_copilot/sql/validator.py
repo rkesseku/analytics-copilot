@@ -22,12 +22,14 @@ from sqlglot.errors import ParseError
 
 
 # Tables the LLM is allowed to query.
-DEFAULT_ALLOWED_TABLES: frozenset[str] = frozenset({
-    "customers",
-    "products",
-    "orders",
-    "order_items",
-})
+DEFAULT_ALLOWED_TABLES: frozenset[str] = frozenset(
+    {
+        "customers",
+        "products",
+        "orders",
+        "order_items",
+    }
+)
 
 
 class SQLValidationError(Exception):
@@ -74,19 +76,23 @@ class SQLValidator:
         # Layer 2: statement type
         if not isinstance(parsed, exp.Select):
             statement_name = type(parsed).__name__.upper()
-            raise SQLValidationError(
-                f"Only SELECT statements are allowed; got {statement_name}."
-            )
+            raise SQLValidationError(f"Only SELECT statements are allowed; got {statement_name}.")
 
         # Reject any mutating subordinate statements
         for node in parsed.walk():
-            if isinstance(node, (
-                exp.Insert, exp.Update, exp.Delete, exp.Drop, exp.Create,
-                exp.Alter, exp.TruncateTable,
-            )):
-                raise SQLValidationError(
-                    f"Mutation operation not allowed: {type(node).__name__}."
-                )
+            if isinstance(
+                node,
+                (
+                    exp.Insert,
+                    exp.Update,
+                    exp.Delete,
+                    exp.Drop,
+                    exp.Create,
+                    exp.Alter,
+                    exp.TruncateTable,
+                ),
+            ):
+                raise SQLValidationError(f"Mutation operation not allowed: {type(node).__name__}.")
 
         # Layer 3: table allow-list
         # Collect CTE alias names first -- they are virtual tables, not real ones.

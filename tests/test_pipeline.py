@@ -34,9 +34,7 @@ class TwoStageFake:
     ):
         from analytics_copilot.llm.client import CompletionResult
 
-        self.calls.append(
-            {"system": system[:50], "user": user[:80], "temperature": temperature}
-        )
+        self.calls.append({"system": system[:50], "user": user[:80], "temperature": temperature})
         response = self._responses[min(self._idx, len(self._responses) - 1)]
         self._idx += 1
         return CompletionResult(
@@ -60,11 +58,13 @@ def seeded_db() -> Database:
 class TestPipelineHappyPath:
     def test_ask_runs_full_pipeline(self, seeded_db: Database) -> None:
         # The fake LLM "generates" a valid SQL query, then "summarizes" the result.
-        sql_response = json.dumps({
-            "sql": "SELECT name, country FROM customers ORDER BY customer_id LIMIT 3",
-            "rationale": "Listing the first three customers.",
-            "confidence": 0.95,
-        })
+        sql_response = json.dumps(
+            {
+                "sql": "SELECT name, country FROM customers ORDER BY customer_id LIMIT 3",
+                "rationale": "Listing the first three customers.",
+                "confidence": 0.95,
+            }
+        )
         summary_response = "Three customers were returned, sorted by signup order."
 
         fake_llm = TwoStageFake(sql_response, summary_response)
@@ -96,11 +96,13 @@ class TestPipelineSafetyEnforcement:
     def test_unsafe_sql_blocked_at_validator(self, seeded_db: Database) -> None:
         # Even if the LLM somehow returns a DROP, the validator must block it
         # before it touches the database.
-        sql_response = json.dumps({
-            "sql": "DROP TABLE customers",
-            "rationale": "destructive",
-            "confidence": 0.99,
-        })
+        sql_response = json.dumps(
+            {
+                "sql": "DROP TABLE customers",
+                "rationale": "destructive",
+                "confidence": 0.99,
+            }
+        )
         summary_response = "should never be reached"
 
         fake_llm = TwoStageFake(sql_response, summary_response)
@@ -119,11 +121,13 @@ class TestPipelineSafetyEnforcement:
         assert result.rows[0][0] == 10
 
     def test_disallowed_table_blocked(self, seeded_db: Database) -> None:
-        sql_response = json.dumps({
-            "sql": "SELECT * FROM admin_audit_log",
-            "rationale": "exfiltration attempt",
-            "confidence": 0.99,
-        })
+        sql_response = json.dumps(
+            {
+                "sql": "SELECT * FROM admin_audit_log",
+                "rationale": "exfiltration attempt",
+                "confidence": 0.99,
+            }
+        )
         summary_response = "should never be reached"
 
         fake_llm = TwoStageFake(sql_response, summary_response)

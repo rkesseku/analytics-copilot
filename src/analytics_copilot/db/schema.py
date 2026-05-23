@@ -71,6 +71,7 @@ SCHEMA_DDL: list[str] = [
 # Seed data
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True, slots=True)
 class _Customer:
     name: str
@@ -87,40 +88,40 @@ class _Product:
 
 
 _CUSTOMERS: list[_Customer] = [
-    _Customer("Alice Chen",      "alice@example.com",   "USA",       540),
-    _Customer("Bob Martinez",    "bob@example.com",     "USA",       480),
-    _Customer("Carla Diaz",      "carla@example.com",   "Mexico",    420),
-    _Customer("Daniel Okoye",    "daniel@example.com",  "Nigeria",   380),
-    _Customer("Elena Rossi",     "elena@example.com",   "Italy",     330),
-    _Customer("Felix Wong",      "felix@example.com",   "USA",       290),
-    _Customer("Grace Adeyemi",   "grace@example.com",   "Nigeria",   250),
-    _Customer("Hiro Tanaka",     "hiro@example.com",    "Japan",     180),
-    _Customer("Isabel Santos",   "isabel@example.com",  "Mexico",    140),
-    _Customer("Jamal Williams",  "jamal@example.com",   "USA",        90),
+    _Customer("Alice Chen", "alice@example.com", "USA", 540),
+    _Customer("Bob Martinez", "bob@example.com", "USA", 480),
+    _Customer("Carla Diaz", "carla@example.com", "Mexico", 420),
+    _Customer("Daniel Okoye", "daniel@example.com", "Nigeria", 380),
+    _Customer("Elena Rossi", "elena@example.com", "Italy", 330),
+    _Customer("Felix Wong", "felix@example.com", "USA", 290),
+    _Customer("Grace Adeyemi", "grace@example.com", "Nigeria", 250),
+    _Customer("Hiro Tanaka", "hiro@example.com", "Japan", 180),
+    _Customer("Isabel Santos", "isabel@example.com", "Mexico", 140),
+    _Customer("Jamal Williams", "jamal@example.com", "USA", 90),
 ]
 
 
 _PRODUCTS: list[_Product] = [
     # Electronics
-    _Product("Wireless Earbuds Pro",  "Electronics", Decimal("129.99")),
-    _Product("Smart Home Hub",        "Electronics", Decimal("89.50")),
-    _Product("4K Action Camera",      "Electronics", Decimal("249.00")),
+    _Product("Wireless Earbuds Pro", "Electronics", Decimal("129.99")),
+    _Product("Smart Home Hub", "Electronics", Decimal("89.50")),
+    _Product("4K Action Camera", "Electronics", Decimal("249.00")),
     # Apparel
-    _Product("Merino Wool Sweater",   "Apparel",     Decimal("78.00")),
-    _Product("Athletic Sneakers",     "Apparel",     Decimal("110.00")),
-    _Product("Rain Jacket",           "Apparel",     Decimal("145.00")),
+    _Product("Merino Wool Sweater", "Apparel", Decimal("78.00")),
+    _Product("Athletic Sneakers", "Apparel", Decimal("110.00")),
+    _Product("Rain Jacket", "Apparel", Decimal("145.00")),
     # Home Goods
-    _Product("Espresso Machine",      "Home Goods",  Decimal("349.99")),
-    _Product("Memory Foam Pillow",    "Home Goods",  Decimal("42.50")),
-    _Product("Kitchen Knife Set",     "Home Goods",  Decimal("189.00")),
+    _Product("Espresso Machine", "Home Goods", Decimal("349.99")),
+    _Product("Memory Foam Pillow", "Home Goods", Decimal("42.50")),
+    _Product("Kitchen Knife Set", "Home Goods", Decimal("189.00")),
     # Books
-    _Product("Atomic Habits",         "Books",       Decimal("18.99")),
-    _Product("Dune (Hardcover)",      "Books",       Decimal("24.50")),
-    _Product("Python for Data Science","Books",      Decimal("39.99")),
+    _Product("Atomic Habits", "Books", Decimal("18.99")),
+    _Product("Dune (Hardcover)", "Books", Decimal("24.50")),
+    _Product("Python for Data Science", "Books", Decimal("39.99")),
     # Outdoor
-    _Product("Camping Tent (2P)",     "Outdoor",     Decimal("210.00")),
-    _Product("Trail Running Shoes",   "Outdoor",     Decimal("135.00")),
-    _Product("Insulated Water Bottle","Outdoor",     Decimal("28.50")),
+    _Product("Camping Tent (2P)", "Outdoor", Decimal("210.00")),
+    _Product("Trail Running Shoes", "Outdoor", Decimal("135.00")),
+    _Product("Insulated Water Bottle", "Outdoor", Decimal("28.50")),
 ]
 
 
@@ -151,6 +152,7 @@ def _seed_orders(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def create_and_seed(
     con: duckdb.DuckDBPyConnection,

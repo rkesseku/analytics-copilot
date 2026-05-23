@@ -63,14 +63,12 @@ def _print_answer(answer: AnswerResult) -> None:
     print("\nGenerated SQL")
     print("-" * 78)
     print(answer.generation.sql)
-    print(
-        f"\n  Tables used: {', '.join(answer.generation.schema_tables_used)}"
-    )
+    print(f"\n  Tables used: {', '.join(answer.generation.schema_tables_used)}")
     print(f"  Confidence:  {answer.generation.confidence:.2f}")
     print(f"  Rationale:   {answer.generation.rationale}")
 
     if answer.execution.row_limit_added:
-        print(f"\n  (Note: a row LIMIT was injected by the safety validator.)")
+        print("\n  (Note: a row LIMIT was injected by the safety validator.)")
 
     print("\nResult")
     print("-" * 78)

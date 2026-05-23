@@ -89,9 +89,7 @@ class ResultSummarizer:
 
         header = " | ".join(columns)
         separator = "-+-".join("-" * len(c) for c in columns)
-        body_lines = [
-            " | ".join(self._fmt_cell(c) for c in row) for row in preview_rows
-        ]
+        body_lines = [" | ".join(self._fmt_cell(c) for c in row) for row in preview_rows]
         table_text = "\n".join([header, separator, *body_lines])
 
         # Defensive cap on prompt size for very wide rows
@@ -107,4 +105,3 @@ class ResultSummarizer:
         if isinstance(value, float):
             return f"{value:.2f}"
         return str(value)
-    
