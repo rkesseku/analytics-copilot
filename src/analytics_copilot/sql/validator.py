@@ -20,7 +20,6 @@ import sqlglot
 from sqlglot import exp
 from sqlglot.errors import ParseError
 
-
 # Tables the LLM is allowed to query.
 DEFAULT_ALLOWED_TABLES: frozenset[str] = frozenset(
     {

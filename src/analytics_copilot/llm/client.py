@@ -13,9 +13,6 @@ import time
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
-from dotenv import load_dotenv
-from groq import Groq
-
 
 @dataclass(frozen=True, slots=True)
 class CompletionResult:
@@ -49,6 +46,9 @@ class GroqClient:
     DEFAULT_MODEL = "llama-3.3-70b-versatile"
 
     def __init__(self, *, model: str | None = None, api_key: str | None = None) -> None:
+        from dotenv import load_dotenv
+        from groq import Groq
+
         load_dotenv()
         key = api_key or os.getenv("GROQ_API_KEY")
         if not key:

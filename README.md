@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/rkesseku/analytics-copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/rkesseku/analytics-copilot/actions/workflows/ci.yml)
 
-A conversational analytics copilot. Ask business questions in plain English; get back governed SQL, executed results, and a written summary.
+A conversational analytics copilot. Ask business questions in plain English; get back governed SQL, executed results, an optional chart, and a written summary. Runs on DuckDB by default; a Databricks SQL Warehouse adapter is included, and a held-out query bank with an LLM-as-judge harness guards against regressions.
 
 ## Why this exists
 
@@ -63,18 +63,24 @@ exclude pending or cancelled orders.
 - ✅ **LLM text-to-SQL generator** with structured (Pydantic) output and confidence scoring
 - ✅ **Three-layer SQL safety validator**: parse → statement-type → table allow-list, with CTE awareness and auto LIMIT injection
 - ✅ **DuckDB execution layer** with context-manager-safe connection lifecycle
+- ✅ **Pluggable SQL backends** behind a small `Backend` protocol (`db/backend.py`): DuckDB is the default; a **Databricks SQL Warehouse adapter** (`db/databricks.py`) is selectable via `--backend databricks` or `ANALYTICS_BACKEND`. The validator parses in the backend's dialect. The adapter uses the optional `databricks-sql-connector` extra, reads `DATABRICKS_*` env vars, and supports Unity Catalog `catalog.schema` schema introspection via `information_schema`. It is unit-tested against a fake connection; it has not been exercised against a live workspace in CI.
+- ✅ **Charts**: `viz.py` picks a chart from the result shape (date + number -> line, category + number -> bar, single value -> none), renders a PNG with matplotlib (Agg), and is exposed as `AnswerResult.chart_path` and the CLI `--chart out.png` flag
+- ✅ **Regression harness** (`analytics_copilot.evals`): a versioned held-out query bank (`evals/query_bank.yaml`, 25 questions with gold SQL against the demo schema). Each run scores (a) execution accuracy, comparing result sets against the gold SQL (order-insensitive, tolerant numeric compare) and (b) an LLM-as-judge rubric score for the written commentary (faithfulness / relevance / clarity, structured JSON parsed with pydantic). It writes JSON + Markdown reports and exits non-zero below a configurable accuracy threshold. A CI job runs it only when a `GROQ_API_KEY` secret is configured. Harness logic is tested with stub LLM clients.
 - ✅ **Result summarizer** producing executive-friendly prose with caveats
 - ✅ **CLI** with single-question and interactive modes
-- ✅ **52 unit tests** covering every layer, including end-to-end pipeline tests using fake LLM clients (zero network in CI)
+- ✅ **Unit tests** covering every layer, including end-to-end pipeline tests using fake LLM clients (zero network in CI)
 
 ## Roadmap
 
 - [ ] Embedding-based schema retriever for large schemas
 - [ ] Self-correction loop: if SQL fails to execute, feed error back to the LLM
-- [ ] Eval integration with [llm-eval-harness](https://github.com/rkesseku/llm-eval-harness) for SQL correctness scoring
+- [x] Eval harness: held-out query bank + execution accuracy + LLM-as-judge commentary scoring
+- [x] Chart output (PNG) chosen from the result shape
+- [x] Databricks SQL Warehouse backend via adapter (tested with a fake connection; live-workspace validation still to do)
+- [ ] Publish a baseline eval report once a run has been recorded
 - [ ] Streamlit UI for non-CLI demos
 - [ ] Additional LLM providers (OpenAI, Anthropic, Ollama)
-- [ ] Multi-database support (Postgres, Snowflake, BigQuery)
+- [ ] More database backends (Postgres, Snowflake, BigQuery) behind the same `Backend` protocol
 
 ## Quick start
 
@@ -99,9 +105,24 @@ python -m analytics_copilot.cli "What are the top 3 product categories by revenu
 # Or interactively
 python -m analytics_copilot.cli --interactive
 
+# Charts: save a PNG when the result shape supports one
+python -m analytics_copilot.cli "Monthly revenue in 2025" --chart revenue.png
+
+# Databricks SQL Warehouse (optional extra; set DATABRICKS_* vars in .env)
+pip install -e ".[databricks]"
+python -m analytics_copilot.cli "Top 3 categories by revenue" --backend databricks
+
+# Regression harness over the held-out query bank (needs GROQ_API_KEY)
+python -m analytics_copilot.evals --min-accuracy 0.8   # reports in evals/reports/
+python -m analytics_copilot.evals --no-judge --limit 5  # quick run, no judge calls
+
 # Run tests
 pytest -v
 ```
+
+On Databricks the warehouse must already contain the allow-listed tables
+(`customers`, `products`, `orders`, `order_items`); nothing is seeded there, and
+the schema metadata the LLM sees is still the hand-curated demo metadata.
 
 ## Architecture
 
@@ -118,12 +139,23 @@ src/analytics_copilot/
 │   ├── validator.py       # Three-layer SQL safety check
 │   └── executor.py        # Validator + database executor
 ├── db/
-│   ├── database.py        # DuckDB connection wrapper
+│   ├── backend.py         # Backend protocol + QueryResult
+│   ├── database.py        # DuckDB backend (default)
+│   ├── databricks.py      # Databricks SQL Warehouse backend (optional extra)
+│   ├── factory.py         # Backend selection (--backend / ANALYTICS_BACKEND)
 │   └── schema.py          # Seed-data generator
+├── viz.py                 # Chart selection + matplotlib PNG rendering
+├── evals/
+│   ├── bank.py            # Query bank loader (pydantic-validated YAML)
+│   ├── compare.py         # Order-insensitive, tolerant result-set comparison
+│   ├── judge.py           # LLM-as-judge rubric + verdict parsing
+│   └── runner.py          # Harness, JSON/Markdown reports, CLI
 ├── pipeline.py            # AnalyticsCopilot facade (ties it all together)
 └── cli.py                 # Command-line entry point
 
-tests/                     # 52 unit tests, no network calls in CI
+evals/query_bank.yaml      # Versioned held-out questions + gold SQL
+
+tests/                     # Unit tests, no network calls in CI
 ```
 
 ### Design notes

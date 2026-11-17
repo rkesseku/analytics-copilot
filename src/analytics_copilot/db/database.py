@@ -5,26 +5,22 @@ Thin wrapper around DuckDB connection management.
 
 We expose a single `Database` class that owns a connection, can be used as a
 context manager, and offers a `query()` method returning structured results.
-This is the only file in the codebase that imports `duckdb` directly -- every
-other module talks to `Database`.
+This is the only file in the codebase that imports `duckdb` directly (lazily,
+in `connect()`). `Database` implements the `Backend` protocol from
+`db.backend`; other engines live in sibling modules.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import duckdb
+from analytics_copilot.db.backend import QueryResult
 
+if TYPE_CHECKING:  # duckdb is imported lazily in connect()
+    import duckdb
 
-@dataclass(frozen=True, slots=True)
-class QueryResult:
-    """Result of executing a SQL query."""
-
-    columns: list[str]
-    rows: list[tuple[Any, ...]]
-    row_count: int
+__all__ = ["Database", "QueryResult"]
 
 
 class Database:
@@ -41,7 +37,11 @@ class Database:
         self._path = str(path) if path is not None else ":memory:"
         self._con: duckdb.DuckDBPyConnection | None = None
 
-    def __enter__(self) -> "Database":
+    @property
+    def dialect(self) -> str:
+        return "duckdb"
+
+    def __enter__(self) -> Database:  # noqa: PYI034 - py3.10 has no typing.Self
         self.connect()
         return self
 
@@ -56,6 +56,8 @@ class Database:
 
     def connect(self) -> None:
         if self._con is None:
+            import duckdb
+
             self._con = duckdb.connect(self._path)
 
     def close(self) -> None:
@@ -79,3 +81,14 @@ class Database:
         rows = cursor.fetchall()
         columns = [desc[0] for desc in cursor.description] if cursor.description else []
         return QueryResult(columns=columns, rows=rows, row_count=len(rows))
+
+    def list_columns(self) -> dict[str, list[tuple[str, str]]]:
+        """Introspect tables in the main schema via information_schema."""
+        result = self.query(
+            "SELECT table_name, column_name, data_type FROM information_schema.columns "
+            "WHERE table_schema = 'main' ORDER BY table_name, ordinal_position"
+        )
+        out: dict[str, list[tuple[str, str]]] = {}
+        for table, column, dtype in result.rows:
+            out.setdefault(str(table), []).append((str(column), str(dtype)))
+        return out

@@ -8,6 +8,7 @@ Wires together every component:
   2. Text-to-SQL generator produces structured SQL output.
   3. SQL executor validates and runs the query.
   4. Summarizer produces a natural-language answer.
+  5. Optionally, a chart is rendered from the result (viz module).
 
 Returns a structured AnswerResult so callers (CLI, tests, future UIs) can
 display whichever parts they want.
@@ -17,8 +18,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
+from pathlib import Path
 
+from analytics_copilot.db.backend import Backend
 from analytics_copilot.db.database import Database
+from analytics_copilot.db.factory import create_backend
 from analytics_copilot.db.schema import create_and_seed
 from analytics_copilot.llm.client import GroqClient, LLMClient
 from analytics_copilot.llm.summarizer import ResultSummarizer
@@ -26,6 +30,8 @@ from analytics_copilot.llm.text_to_sql import SQLGenerationOutput, TextToSQLGene
 from analytics_copilot.schema.retrieval import KeywordSchemaRetriever, SchemaRetriever
 from analytics_copilot.sql.executor import ExecutionResult, SQLExecutor
 from analytics_copilot.sql.validator import SQLValidationError, SQLValidator
+
+_DIALECT_LABELS: dict[str, str] = {"duckdb": "DuckDB", "databricks": "Databricks SQL"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +41,7 @@ class AnswerResult:
     question: str
     generation: SQLGenerationOutput
     execution: ExecutionResult
+    chart_path: Path | None  # set when a chart was rendered
     summary: str
     total_tokens: int  # across all LLM calls in this answer
     total_latency_ms: float
@@ -56,7 +63,7 @@ class AnalyticsCopilot:
     def __init__(
         self,
         *,
-        database: Database,
+        database: Backend,
         llm_client: LLMClient | None = None,
         retriever: SchemaRetriever | None = None,
         validator: SQLValidator | None = None,
@@ -71,11 +78,18 @@ class AnalyticsCopilot:
         self._generator = TextToSQLGenerator(
             llm_client=self._llm,
             retriever=self._retriever,
+            dialect_label=_DIALECT_LABELS.get(database.dialect, database.dialect),
         )
         self._summarizer = ResultSummarizer(llm_client=self._llm)
         self.stats = PipelineStats()
 
-    def ask(self, question: str, *, today: date | None = None) -> AnswerResult:
+    def ask(
+        self,
+        question: str,
+        *,
+        today: date | None = None,
+        chart_path: str | Path | None = None,
+    ) -> AnswerResult:
         """Answer a natural-language question end-to-end.
 
         Raises
@@ -108,6 +122,18 @@ class AnalyticsCopilot:
             self.stats.errors.append(f"validation: {exc}")
             raise
 
+        # 5 (optional): render a chart when requested and the shape supports one
+        rendered: Path | None = None
+        if chart_path is not None:
+            from analytics_copilot.viz import render_chart
+
+            rendered = render_chart(
+                execution.result.columns,
+                execution.result.rows,
+                chart_path,
+                title=question,
+            )
+
         # Stats accounting: only successful answers contribute (errors counted separately)
         self.stats.total_questions += 1
         # We don't currently track per-call tokens through the LLMClient protocol,
@@ -118,15 +144,29 @@ class AnalyticsCopilot:
             question=question,
             generation=generation,
             execution=execution,
+            chart_path=rendered,
             summary=summary,
             total_tokens=0,
             total_latency_ms=0.0,
         )
 
 
-def build_demo_copilot(*, today: date | None = None) -> AnalyticsCopilot:
-    """Convenience factory: builds a copilot with a fresh in-memory seeded DB."""
-    db = Database()
+def build_demo_copilot(
+    *,
+    today: date | None = None,
+    backend: str | None = None,
+    llm_client: LLMClient | None = None,
+) -> AnalyticsCopilot:
+    """Convenience factory.
+
+    With the default `duckdb` backend this builds a fresh in-memory database
+    seeded with the demo e-commerce data. With `databricks` it connects to the
+    warehouse configured via DATABRICKS_* env vars and does NOT seed anything
+    (the warehouse is expected to already contain the allow-listed tables).
+    `backend` falls back to the ANALYTICS_BACKEND env var, then to `duckdb`.
+    """
+    db = create_backend(backend)
     db.connect()
-    create_and_seed(db.connection, seed=42, today=today or date.today())
-    return AnalyticsCopilot(database=db)
+    if isinstance(db, Database):
+        create_and_seed(db.connection, seed=42, today=today or date.today())
+    return AnalyticsCopilot(database=db, llm_client=llm_client)

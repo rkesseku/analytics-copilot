@@ -1,0 +1,243 @@
+# Held-out query bank for the regression harness.
+#
+# - "Held-out" means these questions and gold SQL are never shown to the model
+#   as few-shot examples or schema hints; they exist only to score it.
+# - All gold SQL targets the demo schema (customers, products, orders,
+#   order_items) seeded by `analytics_copilot.db.schema.create_and_seed`
+#   (seed=42, 120 orders) with `today` pinned to `anchor_date` below.
+# - Gold SQL avoids ambiguous ties so result sets are deterministic.
+# - Bump `version` whenever a question or gold query changes, so report
+#   history stays comparable.
+version: 1
+anchor_date: "2026-05-22"
+questions:
+  - id: count-customers
+    category: simple
+    question: How many customers do we have?
+    gold_sql: SELECT COUNT(*) FROM customers
+
+  - id: customers-by-country
+    category: aggregation
+    question: How many customers are there in each country?
+    gold_sql: |
+      SELECT country, COUNT(*) AS n
+      FROM customers
+      GROUP BY country
+
+  - id: products-by-category
+    category: aggregation
+    question: How many products are in each category?
+    gold_sql: |
+      SELECT category, COUNT(*) AS n
+      FROM products
+      GROUP BY category
+
+  - id: active-products
+    category: simple
+    question: How many products are currently active?
+    gold_sql: SELECT COUNT(*) FROM products WHERE is_active
+
+  - id: most-expensive-product
+    category: simple
+    question: Which product has the highest list price, and what is it?
+    gold_sql: |
+      SELECT name, unit_price
+      FROM products
+      ORDER BY unit_price DESC
+      LIMIT 1
+
+  - id: newest-customers
+    category: simple
+    question: Who are the 3 customers who signed up most recently?
+    gold_sql: |
+      SELECT name, signup_date
+      FROM customers
+      ORDER BY signup_date DESC
+      LIMIT 3
+
+  - id: orders-by-status
+    category: aggregation
+    question: How many orders are there in each status?
+    gold_sql: |
+      SELECT status, COUNT(*) AS n
+      FROM orders
+      GROUP BY status
+
+  - id: cancelled-orders
+    category: simple
+    question: How many orders were cancelled?
+    gold_sql: SELECT COUNT(*) FROM orders WHERE status = 'cancelled'
+
+  - id: orders-2026
+    category: time
+    question: How many orders were placed in 2026 so far?
+    gold_sql: SELECT COUNT(*) FROM orders WHERE order_date >= DATE '2026-01-01'
+
+  - id: signups-2025
+    category: time
+    question: How many customers signed up during 2025?
+    gold_sql: |
+      SELECT COUNT(*)
+      FROM customers
+      WHERE signup_date >= DATE '2025-01-01' AND signup_date < DATE '2026-01-01'
+
+  - id: total-revenue
+    category: revenue
+    question: What is our total revenue?
+    gold_sql: |
+      SELECT SUM(oi.quantity * oi.unit_price) AS revenue
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
+      WHERE o.status = 'delivered'
+
+  - id: top-categories-revenue
+    category: revenue
+    question: What are the top 3 product categories by revenue?
+    gold_sql: |
+      SELECT p.category, SUM(oi.quantity * oi.unit_price) AS revenue
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
+      JOIN products p ON oi.product_id = p.product_id
+      WHERE o.status = 'delivered'
+      GROUP BY p.category
+      ORDER BY revenue DESC
+      LIMIT 3
+
+  - id: top-customers-revenue
+    category: revenue
+    question: Who are our top 5 customers by revenue?
+    gold_sql: |
+      SELECT c.name, SUM(oi.quantity * oi.unit_price) AS revenue
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
+      JOIN customers c ON o.customer_id = c.customer_id
+      WHERE o.status = 'delivered'
+      GROUP BY c.name
+      ORDER BY revenue DESC
+      LIMIT 5
+
+  - id: top-products-revenue
+    category: revenue
+    question: What are the top 5 products by revenue?
+    gold_sql: |
+      SELECT p.name, SUM(oi.quantity * oi.unit_price) AS revenue
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
+      JOIN products p ON oi.product_id = p.product_id
+      WHERE o.status = 'delivered'
+      GROUP BY p.name
+      ORDER BY revenue DESC
+      LIMIT 5
+
+  - id: revenue-by-country
+    category: revenue
+    question: What is the revenue by customer country?
+    gold_sql: |
+      SELECT c.country, SUM(oi.quantity * oi.unit_price) AS revenue
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
+      JOIN customers c ON o.customer_id = c.customer_id
+      WHERE o.status = 'delivered'
+      GROUP BY c.country
+
+  - id: top-country-revenue
+    category: revenue
+    question: Which country generates the most revenue?
+    gold_sql: |
+      SELECT c.country, SUM(oi.quantity * oi.unit_price) AS revenue
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
+      JOIN customers c ON o.customer_id = c.customer_id
+      WHERE o.status = 'delivered'
+      GROUP BY c.country
+      ORDER BY revenue DESC
+      LIMIT 1
+
+  - id: delivered-orders-by-country
+    category: join
+    question: How many delivered orders did customers in each country place?
+    gold_sql: |
+      SELECT c.country, COUNT(*) AS n
+      FROM orders o
+      JOIN customers c ON o.customer_id = c.customer_id
+      WHERE o.status = 'delivered'
+      GROUP BY c.country
+
+  - id: avg-order-value
+    category: revenue
+    question: What is the average order value?
+    gold_sql: |
+      SELECT SUM(oi.quantity * oi.unit_price) / COUNT(DISTINCT o.order_id) AS aov
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
+      WHERE o.status = 'delivered'
+
+  - id: monthly-revenue-2025
+    category: time
+    question: What was the revenue for each month of 2025?
+    gold_sql: |
+      SELECT DATE_TRUNC('month', o.order_date) AS month,
+             SUM(oi.quantity * oi.unit_price) AS revenue
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
+      WHERE o.status = 'delivered'
+        AND o.order_date >= DATE '2025-01-01'
+        AND o.order_date < DATE '2026-01-01'
+      GROUP BY 1
+      ORDER BY 1
+
+  - id: monthly-orders-2025
+    category: time
+    question: How many orders were placed in each month of 2025?
+    gold_sql: |
+      SELECT DATE_TRUNC('month', order_date) AS month, COUNT(*) AS n
+      FROM orders
+      WHERE order_date >= DATE '2025-01-01' AND order_date < DATE '2026-01-01'
+      GROUP BY 1
+      ORDER BY 1
+
+  - id: units-sold
+    category: revenue
+    question: How many units were sold in total?
+    gold_sql: |
+      SELECT SUM(oi.quantity)
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
+      WHERE o.status = 'delivered'
+
+  - id: distinct-products-sold
+    category: revenue
+    question: How many different products have been sold?
+    gold_sql: |
+      SELECT COUNT(DISTINCT oi.product_id)
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
+      WHERE o.status = 'delivered'
+
+  - id: avg-items-per-order
+    category: aggregation
+    question: On average, how many line items does an order contain, across all orders?
+    gold_sql: |
+      SELECT CAST(COUNT(*) AS DOUBLE) / COUNT(DISTINCT order_id)
+      FROM order_items
+
+  - id: electronics-share
+    category: revenue
+    question: What percentage of revenue comes from Electronics?
+    gold_sql: |
+      SELECT 100.0 * SUM(CASE WHEN p.category = 'Electronics'
+                              THEN oi.quantity * oi.unit_price ELSE 0 END)
+             / SUM(oi.quantity * oi.unit_price) AS pct
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
+      JOIN products p ON oi.product_id = p.product_id
+      WHERE o.status = 'delivered'
+
+  - id: open-pipeline-value
+    category: revenue
+    question: What is the total value of orders that are still pending or shipped?
+    gold_sql: |
+      SELECT SUM(oi.quantity * oi.unit_price) AS value
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
+      WHERE o.status IN ('pending', 'shipped')

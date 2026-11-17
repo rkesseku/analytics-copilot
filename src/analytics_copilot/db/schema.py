@@ -20,8 +20,10 @@ import random
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
-import duckdb
+if TYPE_CHECKING:
+    import duckdb
 
 
 # ---------------------------------------------------------------------------

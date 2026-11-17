@@ -7,6 +7,7 @@ and prints SQL, results, and a natural-language summary.
 Usage:
     python -m analytics_copilot.cli "What are the top 3 product categories by revenue?"
     python -m analytics_copilot.cli --interactive
+    python -m analytics_copilot.cli "..." --chart out.png --backend databricks
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import sys
 from datetime import date
 from typing import Any
 
+from analytics_copilot.db.factory import SUPPORTED_BACKENDS
 from analytics_copilot.pipeline import AnalyticsCopilot, AnswerResult, build_demo_copilot
 from analytics_copilot.sql.validator import SQLValidationError
 
@@ -81,16 +83,23 @@ def _print_answer(answer: AnswerResult) -> None:
     print("\nSummary")
     print("-" * 78)
     print(answer.summary)
+    if answer.chart_path is not None:
+        print(f"\nChart saved to {answer.chart_path}")
     print()
 
 
-def _run_one(copilot: AnalyticsCopilot, question: str, today: date | None) -> int:
+def _run_one(
+    copilot: AnalyticsCopilot,
+    question: str,
+    today: date | None,
+    chart: str | None = None,
+) -> int:
     try:
-        answer = copilot.ask(question, today=today)
+        answer = copilot.ask(question, today=today, chart_path=chart)
     except SQLValidationError as exc:
         print(f"ERROR: generated SQL failed safety validation:\n  {exc}", file=sys.stderr)
         return 2
-    except Exception as exc:  # surfaced cleanly to CLI users
+    except Exception as exc:  # noqa: BLE001 - surfaced cleanly to CLI users
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
@@ -98,7 +107,7 @@ def _run_one(copilot: AnalyticsCopilot, question: str, today: date | None) -> in
     return 0
 
 
-def _run_interactive(copilot: AnalyticsCopilot, today: date | None) -> int:
+def _run_interactive(copilot: AnalyticsCopilot, today: date | None, chart: str | None) -> int:
     print("Analytics Copilot — interactive mode (type 'quit' to exit).\n")
     while True:
         try:
@@ -110,7 +119,7 @@ def _run_interactive(copilot: AnalyticsCopilot, today: date | None) -> int:
             continue
         if question.lower() in {"quit", "exit"}:
             return 0
-        _run_one(copilot, question, today)
+        _run_one(copilot, question, today, chart)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -135,16 +144,33 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Anchor 'today' to a specific date (YYYY-MM-DD), useful for reproducible demos.",
     )
+    parser.add_argument(
+        "--backend",
+        choices=SUPPORTED_BACKENDS,
+        default=None,
+        help="SQL backend (default: $ANALYTICS_BACKEND, else duckdb). "
+        "'databricks' reads DATABRICKS_* env vars.",
+    )
+    parser.add_argument(
+        "--chart",
+        metavar="OUT.png",
+        default=None,
+        help="Save a chart of the result to this PNG path (when the result shape supports one).",
+    )
     args = parser.parse_args(argv)
 
     if not args.interactive and not args.question:
         parser.error("Provide a question or use --interactive.")
 
-    copilot = build_demo_copilot(today=args.today)
+    try:
+        copilot = build_demo_copilot(today=args.today, backend=args.backend)
+    except (RuntimeError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
 
     if args.interactive:
-        return _run_interactive(copilot, args.today)
-    return _run_one(copilot, args.question, args.today)
+        return _run_interactive(copilot, args.today, args.chart)
+    return _run_one(copilot, args.question, args.today, args.chart)
 
 
 if __name__ == "__main__":

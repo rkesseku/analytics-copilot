@@ -10,14 +10,14 @@ Workflow per call:
   4. Results are returned along with metadata about what was executed.
 
 Any code that takes untrusted SQL should go through this class -- never call
-Database.query() directly with LLM output.
+Backend.query() directly with LLM output.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from analytics_copilot.db.database import Database, QueryResult
+from analytics_copilot.db.backend import Backend, QueryResult
 from analytics_copilot.sql.validator import (
     SQLValidator,
     ValidationResult,
@@ -38,9 +38,10 @@ class ExecutionResult:
 class SQLExecutor:
     """Validates then executes SQL against the database."""
 
-    def __init__(self, *, database: Database, validator: SQLValidator | None = None) -> None:
+    def __init__(self, *, database: Backend, validator: SQLValidator | None = None) -> None:
         self._db = database
-        self._validator = validator or SQLValidator()
+        # Default validator parses SQL in the backend's own dialect.
+        self._validator = validator or SQLValidator(dialect=database.dialect)
 
     def execute(self, sql: str) -> ExecutionResult:
         """Validate and execute `sql`. Raises SQLValidationError on rejection."""

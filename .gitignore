@@ -68,3 +68,6 @@ output/
 # DuckDB database files (we'll generate these from scripts)
 *.duckdb
 *.duckdb.wal
+
+# Eval run output
+evals/reports/

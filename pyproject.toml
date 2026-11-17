@@ -8,7 +8,7 @@ authors = [
     { name = "Reagan Kesseku", email = "reagankesseku@gmail.com" }
 ]
 license = { text = "MIT" }
-keywords = ["llm", "text-to-sql", "rag", "analytics", "duckdb"]
+keywords = ["llm", "text-to-sql", "rag", "analytics", "duckdb", "databricks"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
@@ -24,15 +24,24 @@ dependencies = [
     "sqlglot>=25.0.0",
     "pydantic>=2.5.0",
     "python-dotenv>=1.0.0",
+    "matplotlib>=3.7.0",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
+databricks = [
+    "databricks-sql-connector>=3.0.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=5.0.0",
     "ruff>=0.6.0",
     "mypy>=1.10.0",
 ]
+
+[project.scripts]
+analytics-copilot = "analytics_copilot.cli:main"
+analytics-copilot-eval = "analytics_copilot.evals.runner:main"
 
 [project.urls]
 Homepage = "https://github.com/rkesseku/analytics-copilot"

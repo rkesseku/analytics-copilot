@@ -27,9 +27,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from analytics_copilot.llm.client import LLMClient
 from analytics_copilot.schema.retrieval import SchemaRetriever
 
-
 SYSTEM_PROMPT_TEMPLATE = dedent("""
-    You are an expert SQL analyst working on a DuckDB database. Your job is to
+    You are an expert SQL analyst working on a {dialect} database. Your job is to
     convert a business question into a correct, safe, read-only SQL query.
 
     Rules you MUST follow:
@@ -76,10 +75,12 @@ class TextToSQLGenerator:
         llm_client: LLMClient,
         retriever: SchemaRetriever,
         top_k: int = 4,
+        dialect_label: str = "DuckDB",
     ) -> None:
         self._llm = llm_client
         self._retriever = retriever
         self._top_k = top_k
+        self._dialect_label = dialect_label
 
     def generate(self, question: str, *, today: date | None = None) -> SQLGenerationOutput:
         """Convert a natural-language question into a structured SQL output."""
@@ -91,7 +92,9 @@ class TextToSQLGenerator:
         retrieved_table_names = tuple(t.name for t in retrieval.tables)
 
         today_str = (today or date.today()).isoformat()
-        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(today=today_str)
+        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
+            today=today_str, dialect=self._dialect_label
+        )
         user_prompt = dedent(f"""
             SCHEMA:
             {schema_block}
@@ -127,7 +130,7 @@ class TextToSQLGenerator:
             raise ValueError(f"Generator returned non-JSON output: {text!r}") from exc
 
         if not isinstance(data, dict):
-            raise ValueError(f"Generator output is not a JSON object: {text!r}")
+            raise ValueError(f"Generator output is not a JSON object: {text!r}")  # noqa: TRY004
 
         for required in ("sql", "confidence"):
             if required not in data:

@@ -15,7 +15,6 @@ from typing import Any
 
 from analytics_copilot.llm.client import LLMClient
 
-
 SYSTEM_PROMPT = dedent("""
     You are a senior analyst summarizing a query result for a busy executive.
 
