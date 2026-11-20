@@ -2,16 +2,16 @@
 
 [![CI](https://github.com/rkesseku/analytics-copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/rkesseku/analytics-copilot/actions/workflows/ci.yml)
 
-A conversational analytics copilot. Ask business questions in plain English; get back governed SQL, executed results, an optional chart, and a written summary. Runs on DuckDB by default; a Databricks SQL Warehouse adapter is included, and a held-out query bank with an LLM-as-judge harness guards against regressions.
+A conversational analytics copilot. You ask a business question in plain English and get back governed SQL, the executed results, an optional chart and a written summary. It runs on DuckDB by default and includes a Databricks SQL Warehouse adapter. A held-out query bank with an LLM-as-judge harness guards against regressions.
 
 ## Why this exists
 
-Most organizations have far more data questions than data analysts. "Text-to-SQL" tools promise to close that gap, but a naive LLM-to-database pipeline is a security and correctness disaster. This project demonstrates the **architecture that makes text-to-SQL safe and trustworthy in production**:
+Most organizations have far more data questions than analysts to answer them. "Text-to-SQL" tools promise to close that gap, but a naive LLM-to-database pipeline is a security and correctness disaster. This project demonstrates the **architecture that makes text-to-SQL safe and trustworthy in production**:
 
 - An LLM proposes SQL using retrieved schema context.
 - A **separate validation layer** rejects anything that isn't a safe SELECT against an allow-listed set of tables.
 - The validated SQL is executed against the database.
-- A second LLM call turns results into an executive-friendly summary, with caveats.
+- A second LLM call turns the results into an executive-friendly summary, with caveats.
 
 The LLM never touches the database directly. The validator is the trusted boundary.
 
@@ -59,13 +59,13 @@ exclude pending or cancelled orders.
 ## What's implemented today
 
 - ✅ **Hand-curated schema metadata** with business-meaning descriptions and example values, formatted for LLM consumption
-- ✅ **Keyword-based schema RAG** behind a `SchemaRetriever` protocol (embedding-based retrievers can be swapped in without changes)
+- ✅ **Keyword-based schema RAG** behind a `SchemaRetriever` protocol (embedding-based retrievers can be swapped in without changes elsewhere)
 - ✅ **LLM text-to-SQL generator** with structured (Pydantic) output and confidence scoring
 - ✅ **Three-layer SQL safety validator**: parse → statement-type → table allow-list, with CTE awareness and auto LIMIT injection
 - ✅ **DuckDB execution layer** with context-manager-safe connection lifecycle
-- ✅ **Pluggable SQL backends** behind a small `Backend` protocol (`db/backend.py`): DuckDB is the default; a **Databricks SQL Warehouse adapter** (`db/databricks.py`) is selectable via `--backend databricks` or `ANALYTICS_BACKEND`. The validator parses in the backend's dialect. The adapter uses the optional `databricks-sql-connector` extra, reads `DATABRICKS_*` env vars, and supports Unity Catalog `catalog.schema` schema introspection via `information_schema`. It is unit-tested against a fake connection; it has not been exercised against a live workspace in CI.
-- ✅ **Charts**: `viz.py` picks a chart from the result shape (date + number -> line, category + number -> bar, single value -> none), renders a PNG with matplotlib (Agg), and is exposed as `AnswerResult.chart_path` and the CLI `--chart out.png` flag
-- ✅ **Regression harness** (`analytics_copilot.evals`): a versioned held-out query bank (`evals/query_bank.yaml`, 25 questions with gold SQL against the demo schema). Each run scores (a) execution accuracy, comparing result sets against the gold SQL (order-insensitive, tolerant numeric compare) and (b) an LLM-as-judge rubric score for the written commentary (faithfulness / relevance / clarity, structured JSON parsed with pydantic). It writes JSON + Markdown reports and exits non-zero below a configurable accuracy threshold. A CI job runs it only when a `GROQ_API_KEY` secret is configured. Harness logic is tested with stub LLM clients.
+- ✅ **Pluggable SQL backends** behind a small `Backend` protocol (`db/backend.py`): DuckDB is the default, and a **Databricks SQL Warehouse adapter** (`db/databricks.py`) is selectable via `--backend databricks` or `ANALYTICS_BACKEND`. The validator parses in the backend's dialect. The adapter uses the optional `databricks-sql-connector` extra, reads `DATABRICKS_*` env vars, and supports Unity Catalog `catalog.schema` schema introspection via `information_schema`. It is unit-tested against a fake connection but has not been exercised against a live workspace in CI.
+- ✅ **Charts**: `viz.py` picks a chart type from the shape of the result (date + number -> line, category + number -> bar, single value -> none), renders a PNG with matplotlib (Agg), and exposes it as `AnswerResult.chart_path` and through the CLI `--chart out.png` flag
+- ✅ **Regression harness** (`analytics_copilot.evals`): a versioned held-out query bank (`evals/query_bank.yaml`, 25 questions with gold SQL against the demo schema). Each run scores (a) execution accuracy, comparing result sets with those of the gold SQL (order-insensitive, with a numeric tolerance), and (b) an LLM-as-judge rubric score for the written commentary (faithfulness / relevance / clarity, structured JSON parsed with pydantic). It writes JSON + Markdown reports and exits non-zero when accuracy falls below a configurable threshold. A CI job runs it only when a `GROQ_API_KEY` secret is configured. Harness logic is tested with stub LLM clients.
 - ✅ **Result summarizer** producing executive-friendly prose with caveats
 - ✅ **CLI** with single-question and interactive modes
 - ✅ **Unit tests** covering every layer, including end-to-end pipeline tests using fake LLM clients (zero network in CI)
@@ -73,10 +73,10 @@ exclude pending or cancelled orders.
 ## Roadmap
 
 - [ ] Embedding-based schema retriever for large schemas
-- [ ] Self-correction loop: if SQL fails to execute, feed error back to the LLM
+- [ ] Self-correction loop: if SQL fails to execute, feed the error back to the LLM
 - [x] Eval harness: held-out query bank + execution accuracy + LLM-as-judge commentary scoring
 - [x] Chart output (PNG) chosen from the result shape
-- [x] Databricks SQL Warehouse backend via adapter (tested with a fake connection; live-workspace validation still to do)
+- [x] Databricks SQL Warehouse backend via adapter (tested with a fake connection, with live-workspace validation still to do)
 - [ ] Publish a baseline eval report once a run has been recorded
 - [ ] Streamlit UI for non-CLI demos
 - [ ] Additional LLM providers (OpenAI, Anthropic, Ollama)
@@ -121,7 +121,7 @@ pytest -v
 ```
 
 On Databricks the warehouse must already contain the allow-listed tables
-(`customers`, `products`, `orders`, `order_items`); nothing is seeded there, and
+(`customers`, `products`, `orders`, `order_items`). Nothing is seeded there, and
 the schema metadata the LLM sees is still the hand-curated demo metadata.
 
 ## Architecture
@@ -160,9 +160,9 @@ tests/                     # Unit tests, no network calls in CI
 
 ### Design notes
 
-- **Trusted boundary at the validator.** The LLM never executes SQL directly. Every SQL string passes through `sql.validator` first — parse with sqlglot, reject non-SELECT, enforce table allow-list, inject row limit. Even prompt injection that successfully manipulates the LLM can't reach the database.
+- **Trusted boundary at the validator.** The LLM never executes SQL directly. Every SQL string passes through `sql.validator` first, which parses it with sqlglot, rejects anything but SELECT, enforces the table allow-list and injects a row limit. Even prompt injection that successfully manipulates the LLM can't reach the database.
 - **`Protocol` everywhere.** `LLMClient`, `SchemaRetriever`, and `Database` are structurally typed. Tests inject fake implementations and run with zero network calls in well under a second per test.
-- **Structured LLM outputs.** Both the SQL generator and the summarizer are constrained to JSON/prose with explicit shape. Pydantic enforces the contract; the parser is defensive against markdown fences.
+- **Structured LLM outputs.** Both the SQL generator and the summarizer are constrained to JSON/prose with an explicit shape. Pydantic enforces the contract, and the parser guards against markdown fences.
 - **Hand-written schema metadata is intentional.** Auto-introspected schemas miss the business semantics (`unit_price` is "price at time of order, not current") that make text-to-SQL actually work. A production system would pull from a data catalog with these same fields.
 
 ## License
